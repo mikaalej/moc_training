@@ -1,19 +1,21 @@
 import axiosClient from './axiosClient';
 
-export enum TaskType {
-  Evaluation = 1,
-  Documentation = 2,
-  Approval = 3,
-  Implementation = 4,
-  Restoration = 5,
-  Review = 6,
-}
+export const TaskType = {
+  Evaluation: 1,
+  Documentation: 2,
+  Approval: 3,
+  Implementation: 4,
+  Restoration: 5,
+  Review: 6,
+} as const;
+export type TaskType = (typeof TaskType)[keyof typeof TaskType];
 
-export enum MocTaskStatus {
-  Open = 1,
-  Completed = 2,
-  Cancelled = 3,
-}
+export const MocTaskStatus = {
+  Open: 1,
+  Completed: 2,
+  Cancelled: 3,
+} as const;
+export type MocTaskStatus = (typeof MocTaskStatus)[keyof typeof MocTaskStatus];
 
 export interface TaskItem {
   id: string;

@@ -15,7 +15,6 @@ import {
   TableRow,
   CircularProgress,
   Alert,
-  Divider,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -31,9 +30,17 @@ import {
   PlayCircle as ReactivateIcon,
   Check as CheckIcon,
   Schedule as ScheduleIcon,
+  History as HistoryIcon,
+  Timeline as TimelineIcon,
 } from '@mui/icons-material';
+import Stepper from '@mui/material/Stepper';
+import Step from '@mui/material/Step';
+import StepLabel from '@mui/material/StepLabel';
+import StepContent from '@mui/material/StepContent';
 import { mocApi, MocStatus, MocStage, RiskLevel } from '../api/mocApi';
-import type { MocRequestDetail, MocActionItem, MocDocument, MocApprover } from '../api/mocApi';
+import type { MocRequestDetail, MocActionItem, MocDocument, MocApprover, ActivityLogEntry } from '../api/mocApi';
+import { useAuth } from '../contexts/AuthContext';
+import { canAdvanceOrChangeWorkflowState, canCompleteApproverSlot } from '../utils/permissions';
 
 /**
  * MOC Detail page: full request view with workflow actions.
@@ -42,14 +49,17 @@ import type { MocRequestDetail, MocActionItem, MocDocument, MocApprover } from '
 export default function MocDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [moc, setMoc] = useState<MocRequestDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [confirmAction, setConfirmAction] = useState<'submit' | 'advance' | 'inactive' | 'reactivate' | null>(null);
+  const [confirmAction, setConfirmAction] = useState<'submit' | 'advance' | 'inactive' | 'reactivate' | 'resetApprovers' | null>(null);
   const [completeApproverSlot, setCompleteApproverSlot] = useState<{ approverId: string; approved: boolean } | null>(null);
   const [approverRemarks, setApproverRemarks] = useState('');
+  const [activity, setActivity] = useState<ActivityLogEntry[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
 
   const fetchMoc = async () => {
     if (!id) return;
@@ -67,9 +77,27 @@ export default function MocDetail() {
     }
   };
 
+  const fetchActivity = async () => {
+    if (!id) return;
+    try {
+      setActivityLoading(true);
+      const res = await mocApi.getActivity(id);
+      setActivity(res.data ?? []);
+    } catch {
+      setActivity([]);
+    } finally {
+      setActivityLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchMoc();
   }, [id]);
+
+  // Load activity when MOC is available
+  useEffect(() => {
+    if (moc?.id) fetchActivity();
+  }, [moc?.id]);
 
   const handleBack = () => navigate('/mocs');
 
@@ -91,9 +119,13 @@ export default function MocDetail() {
         case 'reactivate':
           await mocApi.reactivate(id);
           break;
+        case 'resetApprovers':
+          await mocApi.resetApprovers(id);
+          break;
       }
       setConfirmAction(null);
       await fetchMoc();
+      await fetchActivity();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Action failed.';
       setActionError(msg);
@@ -114,6 +146,7 @@ export default function MocDetail() {
       setCompleteApproverSlot(null);
       setApproverRemarks('');
       await fetchMoc();
+      await fetchActivity();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to record approval.';
       setActionError(msg);
@@ -166,10 +199,11 @@ export default function MocDetail() {
     );
   }
 
+  const canChangeWorkflow = user ? canAdvanceOrChangeWorkflowState(user.roleKey) : false;
   const canSubmit = moc.status === MocStatus.Draft;
-  const canAdvance = [MocStatus.Submitted, MocStatus.Active].includes(moc.status) && moc.currentStage !== MocStage.RestorationOrCloseout;
-  const canMarkInactive = [MocStatus.Submitted, MocStatus.Active].includes(moc.status);
-  const canReactivate = moc.status === MocStatus.Inactive;
+  const canAdvance = canChangeWorkflow && (moc.status === MocStatus.Submitted || moc.status === MocStatus.Active) && moc.currentStage !== MocStage.RestorationOrCloseout;
+  const canMarkInactive = canChangeWorkflow && (moc.status === MocStatus.Submitted || moc.status === MocStatus.Active);
+  const canReactivate = canChangeWorkflow && moc.status === MocStatus.Inactive;
 
   return (
     <Box>
@@ -190,6 +224,11 @@ export default function MocDetail() {
       {actionError && (
         <Alert severity="error" onClose={() => setActionError(null)} sx={{ mb: 2 }}>
           {actionError}
+          {actionError.includes('approver') && (
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              To approve: log in as the user for that role (e.g. <strong>approver_departmentmanager</strong> / Test123!), then use the <strong>Approve</strong> or <strong>Reject</strong> buttons in the <strong>Approvers</strong> table below (right column).
+            </Typography>
+          )}
         </Alert>
       )}
 
@@ -251,6 +290,39 @@ export default function MocDetail() {
           )}
         </Box>
       </Paper>
+
+      {/* Approval progress tracker: stepper showing each approval level and completion (who, when) */}
+      {moc.approvers && moc.approvers.length > 0 && (
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Typography variant="subtitle1" fontWeight={600} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <TimelineIcon fontSize="small" /> Approval progress
+          </Typography>
+          <Stepper orientation="vertical" activeStep={moc.approvers.filter((a) => a.isCompleted).length}>
+            {moc.approvers.map((a: MocApprover) => (
+              <Step key={a.id} completed={a.isCompleted}>
+                <StepLabel
+                  error={a.isCompleted && !a.isApproved}
+                  optional={
+                    a.isCompleted ? (
+                      <Typography variant="caption" color="text.secondary">
+                        {a.isApproved ? 'Approved' : 'Rejected'}
+                        {a.completedBy && ` by ${a.completedBy}`}
+                        {a.completedAtUtc && ` on ${new Date(a.completedAtUtc).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`}
+                        {a.remarks && ` — ${a.remarks}`}
+                      </Typography>
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">Pending</Typography>
+                    )
+                  }
+                >
+                  Level {a.levelOrder}: {a.roleKey}
+                </StepLabel>
+                <StepContent />
+              </Step>
+            ))}
+          </Stepper>
+        </Paper>
+      )}
 
       <Grid container spacing={2}>
         {/* Details */}
@@ -340,46 +412,100 @@ export default function MocDetail() {
 
           {moc.approvers && moc.approvers.length > 0 && (
             <Paper sx={{ p: 2, mt: 2 }}>
-              <Typography variant="h6" gutterBottom>
-                Approvers
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Validation and Final Approval require the corresponding approver to approve before advancing stage.
-              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+                <Box>
+                  <Typography variant="h6" gutterBottom>
+                    Approvers
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Validation and Final Approval require the corresponding approver to approve before advancing stage. Approvals must be completed in approval level order.
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                    If you are the next approver (your role matches the first Pending row), use <strong>Approve</strong> or <strong>Reject</strong> in the Actions column below.
+                  </Typography>
+                  {user?.roleKey && (
+                    <Alert severity="info" sx={{ mt: 1 }}>
+                      <Typography variant="caption">
+                        <strong>You are logged in as:</strong> {user.roleKey}
+                        {moc.approvers.find((ap) => !ap.isCompleted) && (
+                          <> | <strong>Next approver needed:</strong> {moc.approvers.find((ap) => !ap.isCompleted)?.roleKey}</>
+                        )}
+                      </Typography>
+                    </Alert>
+                  )}
+                </Box>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  color="warning"
+                  onClick={() => setConfirmAction('resetApprovers')}
+                  disabled={actionLoading || moc.approvers.every((a) => !a.isCompleted)}
+                >
+                  Reset all to pending
+                </Button>
+              </Box>
               <TableContainer>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
+                      <TableCell>Level</TableCell>
                       <TableCell>Role</TableCell>
                       <TableCell align="center">Status</TableCell>
                       <TableCell align="right">Actions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {moc.approvers.map((a: MocApprover) => (
-                      <TableRow key={a.id}>
-                        <TableCell>{a.roleKey}</TableCell>
-                        <TableCell align="center">
-                          {a.isCompleted ? (
-                            <Chip size="small" color={a.isApproved ? 'success' : 'error'} label={a.isApproved ? 'Approved' : 'Rejected'} />
-                          ) : (
-                            <Chip size="small" variant="outlined" label="Pending" />
-                          )}
-                        </TableCell>
-                        <TableCell align="right">
-                          {!a.isCompleted && (
-                            <Box component="span" sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
-                              <Button size="small" color="success" variant="outlined" onClick={() => { setCompleteApproverSlot({ approverId: a.id, approved: true }); setApproverRemarks(''); }} disabled={actionLoading}>
-                                Approve
-                              </Button>
-                              <Button size="small" color="error" variant="outlined" onClick={() => { setCompleteApproverSlot({ approverId: a.id, approved: false }); setApproverRemarks(''); }} disabled={actionLoading}>
-                                Reject
-                              </Button>
-                            </Box>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {(() => {
+                      const firstIncompleteId = moc.approvers.find((ap) => !ap.isCompleted)?.id;
+                      const userRoleKey = user?.roleKey ?? '';
+                      return moc.approvers.map((a: MocApprover) => {
+                        const isFirstIncomplete = !a.isCompleted && a.id === firstIncompleteId;
+                        const canComplete = isFirstIncomplete && canCompleteApproverSlot(userRoleKey, a.roleKey);
+                        return (
+                          <TableRow key={a.id}>
+                            <TableCell>{a.levelOrder}</TableCell>
+                            <TableCell>{a.roleKey}</TableCell>
+                            <TableCell align="center">
+                              {a.isCompleted ? (
+                                <Chip size="small" color={a.isApproved ? 'success' : 'error'} label={a.isApproved ? 'Approved' : 'Rejected'} />
+                              ) : (
+                                <Chip size="small" variant="outlined" label="Pending" />
+                              )}
+                            </TableCell>
+                            <TableCell align="right">
+                              {!a.isCompleted && (
+                                <Box component="span" sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end', flexDirection: 'column', alignItems: 'flex-end' }}>
+                                  {canComplete ? (
+                                    <>
+                                      <Button size="small" color="success" variant="outlined" onClick={() => { setCompleteApproverSlot({ approverId: a.id, approved: true }); setApproverRemarks(''); }} disabled={actionLoading}>
+                                        Approve
+                                      </Button>
+                                      <Button size="small" color="error" variant="outlined" onClick={() => { setCompleteApproverSlot({ approverId: a.id, approved: false }); setApproverRemarks(''); }} disabled={actionLoading}>
+                                        Reject
+                                      </Button>
+                                    </>
+                                  ) : isFirstIncomplete ? (
+                                    <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'right' }}>
+                                      Only the {a.roleKey} can complete this approval.
+                                      {userRoleKey && (
+                                        <>
+                                          <br />
+                                          <strong>You are logged in as: {userRoleKey}</strong>
+                                        </>
+                                      )}
+                                    </Typography>
+                                  ) : (
+                                    <Typography variant="caption" color="text.secondary">
+                                      Complete earlier approvers first
+                                    </Typography>
+                                  )}
+                                </Box>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      });
+                    })()}
                   </TableBody>
                 </Table>
               </TableContainer>
@@ -452,6 +578,69 @@ export default function MocDetail() {
             </Paper>
           </Grid>
         )}
+
+        {/* Activity / Audit log: who did what and when */}
+        <Grid size={{ xs: 12 }}>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <HistoryIcon fontSize="small" /> Activity log
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Audit trail of actions on this MOC (submitted, approved/rejected, stage advanced, marked inactive, reactivated).
+            </Typography>
+            {activityLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                <CircularProgress size={24} />
+              </Box>
+            ) : activity.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">No activity recorded yet.</Typography>
+            ) : (
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Date &amp; time</TableCell>
+                      <TableCell>Action</TableCell>
+                      <TableCell>By</TableCell>
+                      <TableCell>Details</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {activity.map((entry: ActivityLogEntry) => {
+                      let details = '';
+                      try {
+                        if (entry.detailsJson) {
+                          const d = JSON.parse(entry.detailsJson) as Record<string, unknown>;
+                          if (d.RoleKey != null) details = `Role: ${d.RoleKey}${d.Remarks ? ` — ${d.Remarks}` : ''}`;
+                          else if (d.FromStage != null && d.ToStage != null) details = `${d.FromStage} → ${d.ToStage}`;
+                        }
+                      } catch {
+                        details = entry.detailsJson ?? '';
+                      }
+                      return (
+                        <TableRow key={entry.id}>
+                          <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                            {new Date(entry.timestampUtc).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              size="small"
+                              label={entry.action}
+                              color={entry.action === 'Rejected' ? 'error' : entry.action === 'Approved' ? 'success' : 'default'}
+                              variant={entry.action === 'Submitted' || entry.action === 'StageAdvanced' ? 'outlined' : 'filled'}
+                            />
+                          </TableCell>
+                          <TableCell>{entry.actorDisplay}</TableCell>
+                          <TableCell sx={{ maxWidth: 280 }}>{details || '—'}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Paper>
+        </Grid>
       </Grid>
 
       {/* Confirm dialog */}
@@ -461,6 +650,7 @@ export default function MocDetail() {
           {confirmAction === 'advance' && 'Advance to next stage'}
           {confirmAction === 'inactive' && 'Mark as inactive'}
           {confirmAction === 'reactivate' && 'Reactivate request'}
+          {confirmAction === 'resetApprovers' && 'Reset all approvers to pending'}
         </DialogTitle>
         <DialogContent>
           <DialogContentText>
@@ -468,6 +658,7 @@ export default function MocDetail() {
             {confirmAction === 'advance' && 'Move this request to the next workflow stage. Continue?'}
             {confirmAction === 'inactive' && 'Mark this request as inactive. You can reactivate it later. Continue?'}
             {confirmAction === 'reactivate' && 'Reactivate this request. Continue?'}
+            {confirmAction === 'resetApprovers' && 'All approver decisions will be cleared and every approval level will be set back to Pending. This cannot be undone. Continue?'}
           </DialogContentText>
         </DialogContent>
         <DialogActions>

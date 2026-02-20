@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Moc.Domain.Entities;
 using Moc.Domain.Enums;
+using Moc.Domain;
 
 namespace Moc.Infrastructure.Persistence;
 
@@ -44,6 +45,7 @@ public class MocDbInitializer
             // Only seed demo data in Development environment
             if (_environment.IsDevelopment())
             {
+                await EnsureApproverTestUsersAsync();
                 await SeedDemoDataAsync();
             }
         }
@@ -53,6 +55,66 @@ public class MocDbInitializer
             Console.WriteLine("Database initialization failed: " + ex.Message);
             // Do not rethrow so the API still starts; data endpoints will fail until the database is available.
         }
+    }
+
+    /// <summary>
+    /// Ensures five approver-role test users exist with a known password (Test123!) for testing approval levels.
+    /// Idempotent: creates users only if missing; updates PasswordHash if user exists but has no password.
+    /// </summary>
+    private async Task EnsureApproverTestUsersAsync()
+    {
+        const string TestPassword = "Test123!";
+        var passwordHash = PasswordHelper.Hash(TestPassword);
+        var approverRoles = new[] { "Supervisor", "DepartmentManager", "DivisionManager", "AVP", "SuperUser" };
+        var roleDisplayNames = new Dictionary<string, string>
+        {
+            ["Supervisor"] = "Supervisor (Test)",
+            ["DepartmentManager"] = "Department Manager (Test)",
+            ["DivisionManager"] = "Division Manager (Test)",
+            ["AVP"] = "AVP (Test)",
+            ["SuperUser"] = "Super User (Test)"
+        };
+        var utcNow = DateTime.UtcNow;
+        var createdBy = "system";
+
+        foreach (var roleKey in approverRoles)
+        {
+            var userName = "approver_" + roleKey.ToLowerInvariant();
+            var existing = await _context.AppUsers.FirstOrDefaultAsync(u => u.UserName == userName);
+            if (existing != null)
+            {
+                if (string.IsNullOrEmpty(existing.PasswordHash))
+                {
+                    existing.PasswordHash = passwordHash;
+                    existing.ModifiedAtUtc = utcNow;
+                    existing.ModifiedBy = createdBy;
+                    _logger.LogInformation("Set password for existing test user {UserName}.", userName);
+                }
+                continue;
+            }
+
+            var roleExists = await _context.AppRoles.AnyAsync(r => r.Key == roleKey && r.IsActive);
+            if (!roleExists)
+            {
+                _logger.LogWarning("Approval role {RoleKey} not found; skipping test user.", roleKey);
+                continue;
+            }
+
+            _context.AppUsers.Add(new AppUser
+            {
+                Id = Guid.NewGuid(),
+                UserName = userName,
+                DisplayName = roleDisplayNames.GetValueOrDefault(roleKey, roleKey + " (Test)"),
+                RoleKey = roleKey,
+                IsActive = true,
+                PasswordHash = passwordHash,
+                CreatedAtUtc = utcNow,
+                CreatedBy = createdBy
+            });
+            _logger.LogInformation("Created test approver user {UserName} ({RoleKey}).", userName, roleKey);
+        }
+
+        await _context.SaveChangesAsync();
     }
 
     /// <summary>

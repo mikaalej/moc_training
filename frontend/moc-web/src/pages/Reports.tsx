@@ -140,7 +140,7 @@ export default function Reports() {
       {/* Filters */}
       <Paper sx={{ p: 2, mb: 2 }}>
         <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={3}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <TextField
               label="Date from"
               type="date"
@@ -151,7 +151,7 @@ export default function Reports() {
               size="small"
             />
           </Grid>
-          <Grid item xs={12} md={3}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <TextField
               label="Date to"
               type="date"
@@ -162,7 +162,7 @@ export default function Reports() {
               size="small"
             />
           </Grid>
-          <Grid item xs={12} md={3}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <FormControl fullWidth size="small" sx={{ minWidth: 180 }}>
               <InputLabel>Division</InputLabel>
               <Select
@@ -180,7 +180,7 @@ export default function Reports() {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} md={3}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <Button
               variant="contained"
               onClick={handleLoad}
@@ -202,7 +202,7 @@ export default function Reports() {
       {/* KPIs summary */}
       {kpis && (
         <Grid container spacing={2} sx={{ mb: 2 }}>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <Paper sx={{ p: 2 }}>
               <Typography variant="subtitle2" color="text.secondary">
                 Total MOCs
@@ -213,7 +213,7 @@ export default function Reports() {
               </Typography>
             </Paper>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <Paper sx={{ p: 2 }}>
               <Typography variant="subtitle2" color="text.secondary">
                 Active
@@ -224,7 +224,7 @@ export default function Reports() {
               </Typography>
             </Paper>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <Paper sx={{ p: 2 }}>
               <Typography variant="subtitle2" color="text.secondary">
                 Draft / Submitted
@@ -237,7 +237,7 @@ export default function Reports() {
               </Typography>
             </Paper>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <Paper sx={{ p: 2 }}>
               <Typography variant="subtitle2" color="text.secondary">
                 Risk &amp; SLA

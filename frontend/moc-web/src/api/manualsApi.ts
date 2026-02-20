@@ -5,12 +5,13 @@ import axiosClient from './axiosClient';
  * Supports hierarchical document structure with procedures, work instructions, and forms.
  */
 
-export enum ProcedureNodeType {
-  Procedure = 1,
-  WorkInstruction = 2,
-  Form = 3,
-  Attachment = 4,
-}
+export const ProcedureNodeType = {
+  Procedure: 1,
+  WorkInstruction: 2,
+  Form: 3,
+  Attachment: 4,
+} as const;
+export type ProcedureNodeType = (typeof ProcedureNodeType)[keyof typeof ProcedureNodeType];
 
 export interface Manual {
   id: string;

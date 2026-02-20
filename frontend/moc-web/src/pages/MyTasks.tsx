@@ -179,9 +179,9 @@ export default function MyTasks() {
                 </TableCell>
                 <TableCell>
                   <Chip
-                    label={getRiskLevelName(task.mocRiskLevel)}
+                    label={getRiskLevelName(task.mocRiskLevel as RiskLevel | undefined)}
                     size="small"
-                    color={getRiskLevelColor(task.mocRiskLevel) as any}
+                    color={getRiskLevelColor(task.mocRiskLevel as RiskLevel | undefined) as 'success' | 'warning' | 'error' | 'default'}
                   />
                 </TableCell>
                 <TableCell>

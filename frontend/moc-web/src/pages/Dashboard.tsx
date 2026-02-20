@@ -12,7 +12,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  BarChart,
   Bar,
   LineChart,
   Line,
@@ -289,7 +288,7 @@ export default function Dashboard() {
                     paddingAngle={2}
                     dataKey="value"
                     nameKey="name"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                   >
                     {mocTypesPieData.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={chartColors[index % chartColors.length]} />

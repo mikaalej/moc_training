@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Moc.Infrastructure.Persistence;
 using Moc.Domain.Entities;
+using Moc.Domain;
 
 namespace Moc.Api.Controllers;
 
@@ -87,6 +88,7 @@ public class UsersController : ControllerBase
             DisplayName = dto.DisplayName ?? dto.UserName,
             RoleKey = dto.RoleKey,
             IsActive = dto.IsActive,
+            PasswordHash = !string.IsNullOrWhiteSpace(dto.Password) ? PasswordHelper.Hash(dto.Password!) : null,
             CreatedAtUtc = DateTime.UtcNow,
             CreatedBy = "system"
         };
@@ -137,6 +139,9 @@ public class UsersController : ControllerBase
         if (dto.IsActive.HasValue)
             user.IsActive = dto.IsActive.Value;
 
+        if (dto.Password != null)
+            user.PasswordHash = string.IsNullOrWhiteSpace(dto.Password) ? null : PasswordHelper.Hash(dto.Password);
+
         user.ModifiedAtUtc = DateTime.UtcNow;
         user.ModifiedBy = "system";
         await _context.SaveChangesAsync();
@@ -179,6 +184,8 @@ public record CreateUserDto
     public string? DisplayName { get; init; }
     public string RoleKey { get; init; } = string.Empty;
     public bool IsActive { get; init; } = true;
+    /// <summary>Optional password for stub login (hashed before storing).</summary>
+    public string? Password { get; init; }
 }
 
 public record UpdateUserDto
@@ -187,4 +194,6 @@ public record UpdateUserDto
     public string? DisplayName { get; init; }
     public string? RoleKey { get; init; }
     public bool? IsActive { get; init; }
+    /// <summary>Optional new password (hashed). Set to change user's password; omit to leave unchanged.</summary>
+    public string? Password { get; init; }
 }

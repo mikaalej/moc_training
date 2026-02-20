@@ -5,39 +5,43 @@ import axiosClient from './axiosClient';
  * Supports Standard EMOC, Bypass EMOC, OMOC, and DMOC request types.
  */
 
-// Enums matching backend
-export enum MocRequestType {
-  StandardEmoc = 1,
-  BypassEmoc = 2,
-  Omoc = 3,
-  Dmoc = 4,
-}
+// Const objects matching backend (erasable; no enum)
+export const MocRequestType = {
+  StandardEmoc: 1,
+  BypassEmoc: 2,
+  Omoc: 3,
+  Dmoc: 4,
+} as const;
+export type MocRequestType = (typeof MocRequestType)[keyof typeof MocRequestType];
 
-export enum RiskLevel {
-  Green = 1,
-  Yellow = 2,
-  Red = 3,
-}
+export const RiskLevel = {
+  Green: 1,
+  Yellow: 2,
+  Red: 3,
+} as const;
+export type RiskLevel = (typeof RiskLevel)[keyof typeof RiskLevel];
 
-export enum MocStage {
-  Initiation = 1,
-  Validation = 2,
-  Evaluation = 3,
-  FinalApproval = 4,
-  PreImplementation = 5,
-  Implementation = 6,
-  RestorationOrCloseout = 7,
-}
+export const MocStage = {
+  Initiation: 1,
+  Validation: 2,
+  Evaluation: 3,
+  FinalApproval: 4,
+  PreImplementation: 5,
+  Implementation: 6,
+  RestorationOrCloseout: 7,
+} as const;
+export type MocStage = (typeof MocStage)[keyof typeof MocStage];
 
-export enum MocStatus {
-  Draft = 1,
-  Submitted = 2,
-  Active = 3,
-  Inactive = 4,
-  Approved = 5,
-  Closed = 6,
-  Cancelled = 7,
-}
+export const MocStatus = {
+  Draft: 1,
+  Submitted: 2,
+  Active: 3,
+  Inactive: 4,
+  Approved: 5,
+  Closed: 6,
+  Cancelled: 7,
+} as const;
+export type MocStatus = (typeof MocStatus)[keyof typeof MocStatus];
 
 // Request DTOs matching backend
 export interface MocRequestListItem {
@@ -81,6 +85,8 @@ export interface MocDocument {
 export interface MocApprover {
   id: string;
   roleKey: string;
+  /** 1-based order from approval levels; approvers must complete in this order. */
+  levelOrder: number;
   isCompleted: boolean;
   isApproved?: boolean;
   remarks?: string;
@@ -174,6 +180,15 @@ export interface UpdateMocRequestDto {
   bypassType?: string;
 }
 
+/** Single activity (audit) log entry from GET /mocrequests/{id}/activity. */
+export interface ActivityLogEntry {
+  id: string;
+  action: string;
+  actorDisplay: string;
+  timestampUtc: string;
+  detailsJson?: string;
+}
+
 export interface MocListFilters {
   requestType?: MocRequestType;
   status?: MocStatus;
@@ -254,6 +269,14 @@ export const mocApi = {
   /** Records an approver's decision (approve or reject) for their slot. Required before advancing from Validation or FinalApproval. */
   completeApprover: (mocId: string, approverId: string, body: { approved: boolean; remarks?: string; completedBy?: string }) =>
     axiosClient.post<MocRequestDetail>(`/mocrequests/${mocId}/approvers/${approverId}/complete`, body),
+
+  /** Fetches the activity (audit) log for a MOC: who did what and when. */
+  getActivity: (id: string) =>
+    axiosClient.get<ActivityLogEntry[]>(`/mocrequests/${id}/activity`),
+
+  /** Resets all approvers for this MOC to pending (clears completion and decision). */
+  resetApprovers: (id: string) =>
+    axiosClient.post<MocRequestDetail>(`/mocrequests/${id}/approvers/reset`),
 
   markInactive: (id: string) => 
     axiosClient.post<MocRequestDetail>(`/mocrequests/${id}/mark-inactive`),

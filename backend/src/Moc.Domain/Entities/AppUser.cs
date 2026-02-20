@@ -28,5 +28,10 @@ public class AppUser : AuditableEntity
     /// Whether this user is active (soft delete).
     /// </summary>
     public bool IsActive { get; set; } = true;
+
+    /// <summary>
+    /// Optional password hash for login (stub auth). Null for users created without a password.
+    /// </summary>
+    public string? PasswordHash { get; set; }
 }
 

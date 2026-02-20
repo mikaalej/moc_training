@@ -6,18 +6,20 @@ import axiosClient from './axiosClient';
  * Base path: /dmoc (axiosClient baseURL already includes /api).
  */
 
-export enum DmocStatus {
-  Draft = 0,
-  Submitted = 1,
-  Approved = 2,
-  Rejected = 3,
-  Closed = 4,
-}
+export const DmocStatus = {
+  Draft: 0,
+  Submitted: 1,
+  Approved: 2,
+  Rejected: 3,
+  Closed: 4,
+} as const;
+export type DmocStatus = (typeof DmocStatus)[keyof typeof DmocStatus];
 
-export enum DmocNatureOfChange {
-  Permanent = 0,
-  Temporary = 1,
-}
+export const DmocNatureOfChange = {
+  Permanent: 0,
+  Temporary: 1,
+} as const;
+export type DmocNatureOfChange = (typeof DmocNatureOfChange)[keyof typeof DmocNatureOfChange];
 
 export interface DmocDto {
   id: string;

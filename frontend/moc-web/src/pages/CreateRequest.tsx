@@ -9,10 +9,6 @@ import {
   StepLabel,
   Button,
   TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   FormControlLabel,
   Switch,
   Grid,
@@ -674,7 +670,7 @@ export default function CreateRequest() {
               ]}
               getOptionLabel={(opt) => (typeof opt === 'string' ? opt : opt.label)}
               value={formData.riskLevel ? { value: formData.riskLevel, label: formData.riskLevel === 'Green' ? 'Green (Low)' : formData.riskLevel === 'Yellow' ? 'Yellow (Medium)' : 'Red (High)' } : null}
-              onChange={(_, v) => handleInputChange('riskLevel', v && typeof v !== 'string' ? v.value : (v as string) ?? '')}
+              onChange={(_, v) => handleInputChange('riskLevel', v != null && typeof v !== 'string' ? v.value : (v as string | null) ?? '')}
               renderInput={(params) => <TextField {...params} label="Risk Level Result" />}
             />
           </Grid>

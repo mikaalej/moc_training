@@ -1,9 +1,10 @@
+using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Moc.Infrastructure.Persistence;
 using Moc.Domain.Entities;
 using Moc.Domain.Enums;
-using System.Text;
 
 namespace Moc.Api.Controllers;
 
@@ -159,6 +160,28 @@ public class MocRequestsController : ControllerBase
         var category = await _context.Categories.FindAsync(request.CategoryId);
         var subcategory = await _context.Subcategories.FindAsync(request.SubcategoryId);
 
+        // Resolve approval level order so approvers are returned sorted and with LevelOrder for UI
+        var levels = await _context.ApprovalLevels
+            .Where(x => x.IsActive)
+            .OrderBy(x => x.Order)
+            .ToListAsync();
+        var roleToLevelOrder = levels.ToDictionary(x => x.RoleKey, x => x.Order);
+
+        var approversList = request.Approvers
+            .Select(ap => new MocApproverDto
+            {
+                Id = ap.Id,
+                RoleKey = ap.RoleKey,
+                LevelOrder = roleToLevelOrder.GetValueOrDefault(ap.RoleKey, 999),
+                IsCompleted = ap.IsCompleted,
+                IsApproved = ap.IsApproved,
+                Remarks = ap.Remarks,
+                CompletedAtUtc = ap.CompletedAtUtc,
+                CompletedBy = ap.CompletedBy
+            })
+            .OrderBy(a => a.LevelOrder)
+            .ToList();
+
         return Ok(new MocRequestDetailDto
         {
             Id = request.Id,
@@ -215,16 +238,7 @@ public class MocRequestsController : ControllerBase
                 IsLink = d.IsLink,
                 Url = d.Url
             }).ToList(),
-            Approvers = request.Approvers.Select(ap => new MocApproverDto
-            {
-                Id = ap.Id,
-                RoleKey = ap.RoleKey,
-                IsCompleted = ap.IsCompleted,
-                IsApproved = ap.IsApproved,
-                Remarks = ap.Remarks,
-                CompletedAtUtc = ap.CompletedAtUtc,
-                CompletedBy = ap.CompletedBy
-            }).ToList()
+            Approvers = approversList
         });
     }
 
@@ -279,6 +293,8 @@ public class MocRequestsController : ControllerBase
         };
 
         _context.MocRequests.Add(request);
+        // Audit: log creation (draft or submitted)
+        LogActivity(request.Id, dto.SaveAsDraft ? "DraftCreated" : "Submitted", request.CreatedBy, null);
         await _context.SaveChangesAsync();
 
         // When submitting (not draft), build approver chain from configured approval levels
@@ -390,6 +406,8 @@ public class MocRequestsController : ControllerBase
         request.ModifiedAtUtc = DateTime.UtcNow;
         request.ModifiedBy = "system";
 
+        // Audit: log submission
+        LogActivity(id, "Submitted", request.ModifiedBy, null);
         await _context.SaveChangesAsync();
 
         // Build approver chain from configured approval levels (idempotent if already present)
@@ -399,8 +417,41 @@ public class MocRequestsController : ControllerBase
     }
 
     /// <summary>
+    /// Resets all approvers for this MOC to pending (clears completion, decision, remarks, and completion metadata).
+    /// Declared before the complete endpoint so that the literal path "approvers/reset" is matched and not treated as approverId.
+    /// </summary>
+    [HttpPost("{id}/approvers/reset")]
+    public async Task<ActionResult<MocRequestDetailDto>> ResetApprovers(Guid id)
+    {
+        var request = await _context.MocRequests.FindAsync(id);
+        if (request == null)
+            return NotFound();
+
+        var approvers = await _context.MocApprovers
+            .Where(a => a.MocRequestId == id)
+            .ToListAsync();
+
+        foreach (var ap in approvers)
+        {
+            ap.IsCompleted = false;
+            ap.IsApproved = null;
+            ap.Remarks = null;
+            ap.CompletedAtUtc = null;
+            ap.CompletedBy = null;
+            ap.ModifiedAtUtc = DateTime.UtcNow;
+            ap.ModifiedBy = "system";
+        }
+
+        // Audit: log that approvers were reset
+        LogActivity(id, "ApproversReset", "system", JsonSerializer.Serialize(new { Count = approvers.Count }));
+        await _context.SaveChangesAsync();
+        return await GetById(id);
+    }
+
+    /// <summary>
     /// Records an approver's decision (approve or reject) for their slot.
     /// Only the approver slot for this request can be completed; once completed it cannot be changed.
+    /// Approvers must complete in approval level order: all earlier levels must be completed before this slot can be completed.
     /// Does not advance the stage; use advance-stage after required approvers have completed.
     /// </summary>
     [HttpPost("{id}/approvers/{approverId}/complete")]
@@ -418,6 +469,30 @@ public class MocRequestsController : ControllerBase
         if (approver.IsCompleted)
             return BadRequest(new { message = "This approver slot has already been completed." });
 
+        // Enforce approval level order: all earlier levels must be completed before this slot
+        var levels = await _context.ApprovalLevels
+            .Where(x => x.IsActive)
+            .OrderBy(x => x.Order)
+            .ToListAsync();
+        var roleToOrder = levels.Select((l, i) => new { l.RoleKey, Order = i }).ToDictionary(x => x.RoleKey, x => x.Order);
+        var thisOrder = roleToOrder.TryGetValue(approver.RoleKey, out var o) ? o : int.MaxValue;
+
+        var allApprovers = await _context.MocApprovers
+            .Where(a => a.MocRequestId == id)
+            .ToListAsync();
+        var precedingIncomplete = allApprovers
+            .Where(a => !a.IsCompleted && roleToOrder.GetValueOrDefault(a.RoleKey, int.MaxValue) < thisOrder)
+            .ToList();
+        if (precedingIncomplete.Count > 0)
+        {
+            var roleKeys = precedingIncomplete.Select(a => a.RoleKey).Distinct().ToList();
+            return BadRequest(new
+            {
+                message = "Approvals must be completed in order. The following approver(s) must complete their slot first: " + string.Join(", ", roleKeys) + ".",
+                requiredFirst = roleKeys
+            });
+        }
+
         approver.IsCompleted = true;
         approver.IsApproved = dto.Approved;
         approver.Remarks = dto.Remarks;
@@ -426,6 +501,9 @@ public class MocRequestsController : ControllerBase
         approver.ModifiedAtUtc = DateTime.UtcNow;
         approver.ModifiedBy = dto.CompletedBy ?? "system";
 
+        // Audit: log approval/rejection with role and remarks
+        var approvalDetails = JsonSerializer.Serialize(new { RoleKey = approver.RoleKey, Approved = dto.Approved, Remarks = dto.Remarks ?? "" });
+        LogActivity(id, dto.Approved ? "Approved" : "Rejected", dto.CompletedBy ?? "system", approvalDetails);
         await _context.SaveChangesAsync();
         return await GetById(id);
     }
@@ -451,28 +529,34 @@ public class MocRequestsController : ControllerBase
             return BadRequest(new { message = "Request is already at the final stage." });
         }
 
-        // Gate: require all approvers for the current stage (per Standard EMOC process) to have approved before advancing
-        var requiredRoles = GetRequiredApproverRolesForStage(request.CurrentStage);
-        if (requiredRoles.Count > 0)
+        // Gate: require all approvers up to and including the stage's required role (in level order) to have approved before advancing.
+        // e.g. Validation requires DepartmentManager, so Supervisor (level 1) and DepartmentManager (level 2) must both approve first.
+        var levels = await _context.ApprovalLevels.Where(x => x.IsActive).OrderBy(x => x.Order).ToListAsync();
+        var roleToOrder = levels.Select((l, i) => new { l.RoleKey, Order = i }).ToDictionary(x => x.RoleKey, x => x.Order);
+        var requiredRolesForStage = GetRequiredApproverRolesForStage(request.CurrentStage);
+        if (requiredRolesForStage.Count > 0)
         {
-            var approvers = await _context.MocApprovers
-                .Where(a => a.MocRequestId == id && requiredRoles.Contains(a.RoleKey))
-                .ToListAsync();
-            if (approvers.Count > 0)
+            var maxOrderForStage = requiredRolesForStage
+                .Select(r => roleToOrder.GetValueOrDefault(r, int.MaxValue))
+                .DefaultIfEmpty(-1)
+                .Max();
+            var allApprovers = await _context.MocApprovers.Where(a => a.MocRequestId == id).ToListAsync();
+            var mustBeComplete = allApprovers
+                .Where(a => roleToOrder.GetValueOrDefault(a.RoleKey, int.MaxValue) <= maxOrderForStage)
+                .ToList();
+            var notCompleted = mustBeComplete.Where(a => !a.IsCompleted || a.IsApproved != true).ToList();
+            if (notCompleted.Count > 0)
             {
-                var notCompleted = approvers.Where(a => !a.IsCompleted || a.IsApproved != true).ToList();
-                if (notCompleted.Count > 0)
+                var rolesMissing = notCompleted.Select(a => a.RoleKey).Distinct().ToList();
+                return BadRequest(new
                 {
-                    var rolesMissing = notCompleted.Select(a => a.RoleKey).Distinct().ToList();
-                    return BadRequest(new
-                    {
-                        message = "Cannot advance: the following approver(s) must approve before advancing: " + string.Join(", ", rolesMissing) + ".",
-                        requiredRoles = rolesMissing
-                    });
-                }
+                    message = "Cannot advance: the following approver(s) must approve before advancing: " + string.Join(", ", rolesMissing) + ".",
+                    requiredRoles = rolesMissing
+                });
             }
         }
 
+        var fromStage = request.CurrentStage;
         request.CurrentStage = nextStage.Value;
         
         // Update status based on stage
@@ -488,6 +572,9 @@ public class MocRequestsController : ControllerBase
         request.ModifiedAtUtc = DateTime.UtcNow;
         request.ModifiedBy = "system";
 
+        // Audit: log stage advance
+        var stageDetails = JsonSerializer.Serialize(new { FromStage = fromStage.ToString(), ToStage = nextStage.Value.ToString() });
+        LogActivity(id, "StageAdvanced", request.ModifiedBy, stageDetails);
         await _context.SaveChangesAsync();
 
         return await GetById(id);
@@ -511,6 +598,8 @@ public class MocRequestsController : ControllerBase
         request.ModifiedAtUtc = DateTime.UtcNow;
         request.ModifiedBy = "system";
 
+        // Audit: log marked inactive
+        LogActivity(id, "MarkedInactive", request.ModifiedBy, null);
         await _context.SaveChangesAsync();
 
         return await GetById(id);
@@ -539,9 +628,41 @@ public class MocRequestsController : ControllerBase
         request.ModifiedAtUtc = DateTime.UtcNow;
         request.ModifiedBy = "system";
 
+        // Audit: log reactivation
+        LogActivity(id, "Reactivated", request.ModifiedBy, null);
         await _context.SaveChangesAsync();
 
         return await GetById(id);
+    }
+
+    #endregion
+
+    #region Activity (Audit) Endpoint
+
+    /// <summary>
+    /// Gets the activity (audit) log for a MOC request: who did what and when.
+    /// </summary>
+    [HttpGet("{id}/activity")]
+    public async Task<ActionResult<IEnumerable<ActivityLogEntryDto>>> GetActivity(Guid id)
+    {
+        var exists = await _context.MocRequests.AnyAsync(x => x.Id == id);
+        if (!exists)
+            return NotFound();
+
+        var entries = await _context.ActivityLogs
+            .Where(x => x.MocRequestId == id)
+            .OrderByDescending(x => x.TimestampUtc)
+            .Select(x => new ActivityLogEntryDto
+            {
+                Id = x.Id,
+                Action = x.Action,
+                ActorDisplay = x.ActorEmail ?? "system",
+                TimestampUtc = x.TimestampUtc,
+                DetailsJson = x.AfterSnapshot
+            })
+            .ToListAsync();
+
+        return Ok(entries);
     }
 
     #endregion
@@ -579,6 +700,26 @@ public class MocRequestsController : ControllerBase
     #endregion
 
     #region Private Helpers
+
+    /// <summary>
+    /// Records an audit log entry for the given MOC request. Call before SaveChangesAsync so the entry is persisted with the same transaction.
+    /// </summary>
+    private void LogActivity(Guid mocRequestId, string action, string? actorDisplay, string? afterSnapshotJson)
+    {
+        var now = DateTime.UtcNow;
+        var actor = actorDisplay ?? "system";
+        _context.ActivityLogs.Add(new ActivityLog
+        {
+            Id = Guid.NewGuid(),
+            MocRequestId = mocRequestId,
+            Action = action,
+            ActorEmail = actor,
+            TimestampUtc = now,
+            AfterSnapshot = afterSnapshotJson,
+            CreatedAtUtc = now,
+            CreatedBy = actor
+        });
+    }
 
     /// <summary>
     /// Applies filter criteria to the query.
@@ -980,6 +1121,19 @@ public record CompleteApproverDto
 }
 
 /// <summary>
+/// DTO for a single activity (audit) log entry.
+/// </summary>
+public record ActivityLogEntryDto
+{
+    public Guid Id { get; init; }
+    public string Action { get; init; } = string.Empty;
+    public string ActorDisplay { get; init; } = string.Empty;
+    public DateTime TimestampUtc { get; init; }
+    /// <summary>Optional JSON details (e.g. RoleKey, Remarks, FromStage/ToStage).</summary>
+    public string? DetailsJson { get; init; }
+}
+
+/// <summary>
 /// Action item DTO.
 /// </summary>
 public record MocActionItemDto
@@ -1011,6 +1165,8 @@ public record MocApproverDto
 {
     public Guid Id { get; init; }
     public string RoleKey { get; init; } = string.Empty;
+    /// <summary>1-based order from ApprovalLevels; used to enforce and display approval order.</summary>
+    public int LevelOrder { get; init; }
     public bool IsCompleted { get; init; }
     public bool? IsApproved { get; init; }
     public string? Remarks { get; init; }

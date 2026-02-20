@@ -378,7 +378,7 @@ export default function MocList() {
                   <Select
                     value={filters.riskLevel || ''}
                     label="Risk Level"
-                    onChange={(e) => setFilters({ ...filters, riskLevel: e.target.value ? Number(e.target.value) : undefined })}
+                    onChange={(e) => setFilters({ ...filters, riskLevel: e.target.value ? (Number(e.target.value) as RiskLevel) : undefined })}
                   >
                     <MenuItem value="">All</MenuItem>
                     <MenuItem value={RiskLevel.Green}>Green</MenuItem>
@@ -408,7 +408,7 @@ export default function MocList() {
                   <Select
                     value={filters.isTemporary === undefined ? '' : filters.isTemporary ? 'true' : 'false'}
                     label="Temporary"
-                    onChange={(e) => setFilters({ ...filters, isTemporary: e.target.value === '' ? undefined : e.target.value === 'true' })}
+                    onChange={(e) => setFilters({ ...filters, isTemporary: (e.target.value as string) === '' ? undefined : (e.target.value as string) === 'true' })}
                   >
                     <MenuItem value="">All</MenuItem>
                     <MenuItem value="true">Temporary</MenuItem>

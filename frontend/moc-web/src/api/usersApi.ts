@@ -19,6 +19,8 @@ export interface CreateUserDto {
   displayName?: string;
   roleKey: string;
   isActive?: boolean;
+  /** Password for new user (used by signup; hashed on server). */
+  password?: string;
 }
 
 export interface UpdateUserDto {
@@ -26,6 +28,8 @@ export interface UpdateUserDto {
   displayName?: string;
   roleKey?: string;
   isActive?: boolean;
+  /** New password (optional). Only sent when admin sets a new password on edit. */
+  password?: string;
 }
 
 export const usersApi = {

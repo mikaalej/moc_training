@@ -5,11 +5,12 @@ import axiosClient from './axiosClient';
  * Supports listing, marking as read, and dismissing notifications.
  */
 
-export enum NotificationStatus {
-  Unread = 1,
-  Read = 2,
-  Dismissed = 3,
-}
+export const NotificationStatus = {
+  Unread: 1,
+  Read: 2,
+  Dismissed: 3,
+} as const;
+export type NotificationStatus = (typeof NotificationStatus)[keyof typeof NotificationStatus];
 
 export interface Notification {
   id: string;

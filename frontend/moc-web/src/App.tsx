@@ -5,7 +5,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import CssBaseline from '@mui/material/CssBaseline';
 
 import { ThemeModeProvider, useThemeMode } from './contexts/ThemeModeContext';
+import { AuthProvider } from './contexts/AuthContext';
 import AppLayout from './components/layout/AppLayout';
+import ProtectedRoute from './components/ProtectedRoute';
+import AdminGuard from './components/AdminGuard';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import MyTasks from './pages/MyTasks';
 import CreateRequest from './pages/CreateRequest';
@@ -20,7 +25,7 @@ import Feedback from './pages/Feedback';
 import Notifications from './pages/Notifications';
 import Help from './pages/Help';
 import Admin from './pages/Admin';
-import Placeholder from './pages/Placeholder';
+import UserManagement from './pages/UserManagement';
 
 // Create a React Query client for data fetching
 const queryClient = new QueryClient({
@@ -139,7 +144,9 @@ function AppWithTheme() {
       <CssBaseline />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<AppLayout />}>
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
             <Route index element={<Dashboard />} />
             <Route path="tasks" element={<MyTasks />} />
             <Route path="create" element={<CreateRequest />} />
@@ -153,7 +160,8 @@ function AppWithTheme() {
             <Route path="reports" element={<Reports />} />
             <Route path="feedback" element={<Feedback />} />
             <Route path="help" element={<Help />} />
-            <Route path="admin" element={<Admin />} />
+            <Route path="admin" element={<AdminGuard><Admin /></AdminGuard>} />
+            <Route path="admin/users" element={<AdminGuard><UserManagement /></AdminGuard>} />
             <Route path="notifications" element={<Notifications />} />
           </Route>
         </Routes>
@@ -170,7 +178,9 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeModeProvider>
-        <AppWithTheme />
+        <AuthProvider>
+          <AppWithTheme />
+        </AuthProvider>
       </ThemeModeProvider>
     </QueryClientProvider>
   );

@@ -31,6 +31,7 @@ import {
   Feedback as FeedbackIcon,
   Help as HelpIcon,
   AdminPanelSettings as AdminIcon,
+  People as UserManagementIcon,
   Logout as LogoutIcon,
   Notifications as NotificationsIcon,
   AccountCircle as AccountIcon,
@@ -40,6 +41,8 @@ import {
 } from '@mui/icons-material';
 import { useDmocFeatures } from '../../hooks/useDmocFeatures';
 import { useThemeMode } from '../../contexts/ThemeModeContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { canAccessAdmin } from '../../utils/permissions';
 
 const drawerWidth = 260;
 
@@ -59,7 +62,8 @@ const baseNavItems = [
 ];
 
 const adminItems = [
-  { text: 'Admin & User Management', icon: <AdminIcon />, path: '/admin' },
+  { text: 'Admin (LOVs & approval levels)', icon: <AdminIcon />, path: '/admin' },
+  { text: 'User Management', icon: <UserManagementIcon />, path: '/admin/users' },
 ];
 
 /**
@@ -71,6 +75,7 @@ export default function AppLayout() {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, logout } = useAuth();
   const { enableDmoc } = useDmocFeatures();
   const { mode, toggleMode } = useThemeMode();
 
@@ -92,8 +97,8 @@ export default function AppLayout() {
 
   const handleLogout = () => {
     handleProfileMenuClose();
-    // TODO: Implement actual logout when auth is added
-    console.log('Logout clicked');
+    logout();
+    navigate('/login', { replace: true });
   };
 
   const drawer = (
@@ -120,23 +125,27 @@ export default function AppLayout() {
           </ListItem>
         ))}
       </List>
-      <Divider />
-      <List>
-        {adminItems.map((item) => (
-          <ListItem key={item.text} disablePadding>
-            <ListItemButton
-              selected={location.pathname === item.path}
-              onClick={() => {
-                navigate(item.path);
-                setMobileOpen(false);
-              }}
-            >
-              <ListItemIcon>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.text} />
-            </ListItemButton>
-          </ListItem>
-        ))}
-      </List>
+      {canAccessAdmin(user?.roleKey ?? '') && (
+        <>
+          <Divider />
+          <List>
+            {adminItems.map((item) => (
+              <ListItem key={item.text} disablePadding>
+                <ListItemButton
+                  selected={location.pathname === item.path}
+                  onClick={() => {
+                    navigate(item.path);
+                    setMobileOpen(false);
+                  }}
+                >
+                  <ListItemIcon>{item.icon}</ListItemIcon>
+                  <ListItemText primary={item.text} />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        </>
+      )}
     </Box>
   );
 
@@ -190,7 +199,7 @@ export default function AppLayout() {
             onClose={handleProfileMenuClose}
           >
             <MenuItem disabled>
-              <Typography variant="body2">Demo User (Originator)</Typography>
+              <Typography variant="body2">{user?.displayName || user?.userName || 'User'}</Typography>
             </MenuItem>
             <Divider />
             <MenuItem onClick={handleLogout}>
