@@ -46,6 +46,31 @@ public class Notification : AuditableEntity
     public DateTime? ReadAtUtc { get; set; }
 
     /// <summary>
+    /// Delivery channel (InApp, Email). Additive; defaults to InApp when not set.
+    /// </summary>
+    public NotificationChannel? Channel { get; set; }
+
+    /// <summary>
+    /// Recipient identifier (e.g. email or user key) when not using role/user id.
+    /// </summary>
+    public string? Recipient { get; set; }
+
+    /// <summary>
+    /// Optional rich content or body (Message remains the primary display text).
+    /// </summary>
+    public string? Content { get; set; }
+
+    /// <summary>
+    /// When the recipient acknowledged the notification (optional).
+    /// </summary>
+    public DateTime? AcknowledgedAtUtc { get; set; }
+
+    /// <summary>
+    /// Optional follow-up date for reminders or escalation.
+    /// </summary>
+    public DateTime? FollowUpAtUtc { get; set; }
+
+    /// <summary>
     /// Navigation to request (optional).
     /// </summary>
     public MocRequest? MocRequest { get; set; }

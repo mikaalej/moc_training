@@ -128,6 +128,38 @@ public class MocRequest : AuditableEntity
     public DateTime? MarkedInactiveAtUtc { get; set; }
 
     /// <summary>
+    /// High-level MOC classification (EMOC, DMOC, OMOC) for control number format and reporting.
+    /// Additive; can be derived from RequestType when populated.
+    /// </summary>
+    public MocType? MocType { get; set; }
+
+    /// <summary>
+    /// Control number format components: [Type]-[Year]-[Month]-[Area]-[Category]-[Code].
+    /// Year part (e.g. 2025). Null until control number is generated with structured format.
+    /// </summary>
+    public int? ControlNumberYear { get; set; }
+
+    /// <summary>
+    /// Control number month part (1-12). Null until control number is generated with structured format.
+    /// </summary>
+    public int? ControlNumberMonth { get; set; }
+
+    /// <summary>
+    /// Control number area part (e.g. division/site code). Null until structured format is used.
+    /// </summary>
+    public string? ControlNumberArea { get; set; }
+
+    /// <summary>
+    /// Control number category part. Null until structured format is used.
+    /// </summary>
+    public string? ControlNumberCategory { get; set; }
+
+    /// <summary>
+    /// Control number sequence/code part. Null until structured format is used.
+    /// </summary>
+    public string? ControlNumberCode { get; set; }
+
+    /// <summary>
     /// Collection of action items under this request.
     /// </summary>
     public ICollection<MocActionItem> ActionItems { get; set; } = new List<MocActionItem>();
@@ -141,5 +173,10 @@ public class MocRequest : AuditableEntity
     /// Approver chain slots for this request.
     /// </summary>
     public ICollection<MocApprover> Approvers { get; set; } = new List<MocApprover>();
+
+    /// <summary>
+    /// Activity log entries for this request (audit trail).
+    /// </summary>
+    public ICollection<ActivityLog> ActivityLogs { get; set; } = new List<ActivityLog>();
 }
 

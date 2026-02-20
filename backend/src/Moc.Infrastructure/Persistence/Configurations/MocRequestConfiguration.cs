@@ -25,6 +25,7 @@ public class MocRequestConfiguration : IEntityTypeConfiguration<MocRequest>
         builder.HasIndex(x => x.RequestType);
         builder.HasIndex(x => x.Status);
         builder.HasIndex(x => x.CurrentStage);
+        builder.HasIndex(x => x.ModifiedAtUtc);
         builder.HasIndex(x => x.RiskLevel);
         builder.HasIndex(x => x.EquipmentTag);
         builder.HasIndex(x => new { x.DivisionId, x.DepartmentId, x.SectionId });
@@ -73,6 +74,11 @@ public class MocRequestConfiguration : IEntityTypeConfiguration<MocRequest>
             .HasForeignKey(x => x.MocRequestId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasMany(x => x.ActivityLogs)
+            .WithOne(x => x.MocRequest)
+            .HasForeignKey(x => x.MocRequestId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         // Property configurations
         builder.Property(x => x.ControlNumber)
             .HasMaxLength(50)
@@ -100,5 +106,14 @@ public class MocRequestConfiguration : IEntityTypeConfiguration<MocRequest>
 
         builder.Property(x => x.BypassType)
             .HasMaxLength(100);
+
+        builder.Property(x => x.ControlNumberArea)
+            .HasMaxLength(50);
+
+        builder.Property(x => x.ControlNumberCategory)
+            .HasMaxLength(50);
+
+        builder.Property(x => x.ControlNumberCode)
+            .HasMaxLength(50);
     }
 }

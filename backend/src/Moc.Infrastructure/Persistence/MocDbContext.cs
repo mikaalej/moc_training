@@ -69,6 +69,11 @@ public class MocDbContext : DbContext
     /// </summary>
     public DbSet<MocApprover> MocApprovers => Set<MocApprover>();
 
+    /// <summary>
+    /// DbSet for MOC request activity/audit log entries.
+    /// </summary>
+    public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
+
     // Workflow and task management
     /// <summary>
     /// DbSet for workflow tasks that appear in "My Tasks" screens.

@@ -599,6 +599,68 @@ namespace Moc.Infrastructure.Migrations
                     b.ToTable("MocDocuments");
                 });
 
+            modelBuilder.Entity("Moc.Domain.Entities.ActivityLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ActorEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AfterSnapshot")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("BeforeSnapshot")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeviceInfo")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("IPAddress")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("ModifiedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("MocRequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("TimestampUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Action");
+
+                    b.HasIndex("MocRequestId");
+
+                    b.HasIndex("TimestampUtc");
+
+                    b.ToTable("ActivityLogs");
+                });
+
             modelBuilder.Entity("Moc.Domain.Entities.MocRequest", b =>
                 {
                     b.Property<Guid>("Id")
@@ -619,6 +681,24 @@ namespace Moc.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ControlNumberArea")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ControlNumberCategory")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ControlNumberCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int?>("ControlNumberMonth")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ControlNumberYear")
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
@@ -649,6 +729,9 @@ namespace Moc.Infrastructure.Migrations
 
                     b.Property<DateTime?>("MarkedInactiveAtUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<int?>("MocType")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("ModifiedAtUtc")
                         .HasColumnType("datetime2");
@@ -722,6 +805,8 @@ namespace Moc.Infrastructure.Migrations
 
                     b.HasIndex("SectionId");
 
+                    b.HasIndex("ModifiedAtUtc");
+
                     b.HasIndex("Status");
 
                     b.HasIndex("SubcategoryId");
@@ -739,12 +824,25 @@ namespace Moc.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime?>("AcknowledgedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("Channel")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Content")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("CreatedBy")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("FollowUpAtUtc")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Message")
                         .IsRequired()
@@ -762,6 +860,10 @@ namespace Moc.Infrastructure.Migrations
 
                     b.Property<DateTime?>("ReadAtUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("Recipient")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<string>("RecipientRoleKey")
                         .IsRequired()
@@ -781,7 +883,11 @@ namespace Moc.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Channel");
+
                     b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("FollowUpAtUtc");
 
                     b.HasIndex("MocRequestId");
 
@@ -1170,6 +1276,17 @@ namespace Moc.Infrastructure.Migrations
                     b.Navigation("MocRequest");
                 });
 
+            modelBuilder.Entity("Moc.Domain.Entities.ActivityLog", b =>
+                {
+                    b.HasOne("Moc.Domain.Entities.MocRequest", "MocRequest")
+                        .WithMany("ActivityLogs")
+                        .HasForeignKey("MocRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("MocRequest");
+                });
+
             modelBuilder.Entity("Moc.Domain.Entities.MocDocument", b =>
                 {
                     b.HasOne("Moc.Domain.Entities.MocRequest", "MocRequest")
@@ -1311,6 +1428,8 @@ namespace Moc.Infrastructure.Migrations
             modelBuilder.Entity("Moc.Domain.Entities.MocRequest", b =>
                 {
                     b.Navigation("ActionItems");
+
+                    b.Navigation("ActivityLogs");
 
                     b.Navigation("Approvers");
 

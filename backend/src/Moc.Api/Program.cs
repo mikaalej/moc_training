@@ -14,7 +14,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:5173")
+        policy.WithOrigins("http://localhost:5173", "http://localhost:5174")
               .AllowAnyHeader()
               .AllowAnyMethod();
     });
@@ -58,11 +58,21 @@ app.MapControllers();
 // Health check endpoint
 app.MapHealthChecks("/health");
 
-// Initialize database on startup (runs migrations and seeds demo data in Development)
+// Initialize database on startup (runs migrations and seeds demo data in Development).
+// If the database is unavailable (e.g. LocalDB not running), we still start the API so the server listens
+// and the frontend can connect; requests that need the DB will fail until the database is available.
 using (var scope = app.Services.CreateScope())
 {
     var initializer = scope.ServiceProvider.GetRequiredService<MocDbInitializer>();
-    await initializer.InitializeAsync();
+    try
+    {
+        await initializer.InitializeAsync();
+    }
+    catch (Exception ex)
+    {
+        // Use console to avoid EventLog permission issues in some environments
+        Console.WriteLine("Warning: Database initialization failed. API will start but data endpoints may fail until the database is available. " + ex.Message);
+    }
 }
 
 app.Run();

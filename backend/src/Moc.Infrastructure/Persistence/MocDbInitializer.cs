@@ -49,8 +49,9 @@ public class MocDbInitializer
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An error occurred while initializing the database.");
-            throw;
+            // Log to console only; avoid ILogger (e.g. EventLog) which can throw and crash the process (0xe0434352).
+            Console.WriteLine("Database initialization failed: " + ex.Message);
+            // Do not rethrow so the API still starts; data endpoints will fail until the database is available.
         }
     }
 

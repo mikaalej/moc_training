@@ -32,7 +32,9 @@ public class ErrorHandlingMiddleware
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An unhandled exception occurred: {Message}", ex.Message);
+            // Log without throwing (ILogger can throw e.g. EventLog access denied, causing ERR_EMPTY_RESPONSE).
+            try { _logger.LogError(ex, "An unhandled exception occurred: {Message}", ex.Message); }
+            catch { /* ensure we still send error response to client */ }
             await HandleExceptionAsync(context, ex);
         }
     }
