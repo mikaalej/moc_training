@@ -21,6 +21,7 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  TextField,
 } from '@mui/material';
 import {
   ArrowBack as BackIcon,
@@ -47,6 +48,8 @@ export default function MocDetail() {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<'submit' | 'advance' | 'inactive' | 'reactivate' | null>(null);
+  const [completeApproverSlot, setCompleteApproverSlot] = useState<{ approverId: string; approved: boolean } | null>(null);
+  const [approverRemarks, setApproverRemarks] = useState('');
 
   const fetchMoc = async () => {
     if (!id) return;
@@ -93,6 +96,26 @@ export default function MocDetail() {
       await fetchMoc();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Action failed.';
+      setActionError(msg);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCompleteApproverConfirm = async () => {
+    if (!id || !completeApproverSlot) return;
+    try {
+      setActionLoading(true);
+      setActionError(null);
+      await mocApi.completeApprover(id, completeApproverSlot.approverId, {
+        approved: completeApproverSlot.approved,
+        remarks: approverRemarks.trim() || undefined,
+      });
+      setCompleteApproverSlot(null);
+      setApproverRemarks('');
+      await fetchMoc();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to record approval.';
       setActionError(msg);
     } finally {
       setActionLoading(false);
@@ -320,12 +343,16 @@ export default function MocDetail() {
               <Typography variant="h6" gutterBottom>
                 Approvers
               </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Validation and Final Approval require the corresponding approver to approve before advancing stage.
+              </Typography>
               <TableContainer>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
                       <TableCell>Role</TableCell>
                       <TableCell align="center">Status</TableCell>
+                      <TableCell align="right">Actions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -334,9 +361,21 @@ export default function MocDetail() {
                         <TableCell>{a.roleKey}</TableCell>
                         <TableCell align="center">
                           {a.isCompleted ? (
-                            <Chip size="small" color={a.isApproved ? 'success' : 'default'} label={a.isApproved ? 'Approved' : 'Done'} />
+                            <Chip size="small" color={a.isApproved ? 'success' : 'error'} label={a.isApproved ? 'Approved' : 'Rejected'} />
                           ) : (
                             <Chip size="small" variant="outlined" label="Pending" />
+                          )}
+                        </TableCell>
+                        <TableCell align="right">
+                          {!a.isCompleted && (
+                            <Box component="span" sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                              <Button size="small" color="success" variant="outlined" onClick={() => { setCompleteApproverSlot({ approverId: a.id, approved: true }); setApproverRemarks(''); }} disabled={actionLoading}>
+                                Approve
+                              </Button>
+                              <Button size="small" color="error" variant="outlined" onClick={() => { setCompleteApproverSlot({ approverId: a.id, approved: false }); setApproverRemarks(''); }} disabled={actionLoading}>
+                                Reject
+                              </Button>
+                            </Box>
                           )}
                         </TableCell>
                       </TableRow>
@@ -435,6 +474,36 @@ export default function MocDetail() {
           <Button onClick={() => setConfirmAction(null)}>Cancel</Button>
           <Button onClick={handleAction} variant="contained" disabled={actionLoading}>
             {actionLoading ? 'Processing...' : 'Confirm'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Complete approver dialog (Approve / Reject with optional remarks) */}
+      <Dialog open={completeApproverSlot !== null} onClose={() => { setCompleteApproverSlot(null); setApproverRemarks(''); }}>
+        <DialogTitle>
+          {completeApproverSlot?.approved ? 'Approve' : 'Reject'} request
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {completeApproverSlot?.approved
+              ? 'Record your approval. You may add optional remarks below.'
+              : 'Record your rejection. You may add optional remarks below.'}
+          </DialogContentText>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Remarks (optional)"
+            fullWidth
+            multiline
+            rows={3}
+            value={approverRemarks}
+            onChange={(e) => setApproverRemarks(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setCompleteApproverSlot(null); setApproverRemarks(''); }}>Cancel</Button>
+          <Button onClick={handleCompleteApproverConfirm} variant="contained" color={completeApproverSlot?.approved ? 'success' : 'error'} disabled={actionLoading}>
+            {actionLoading ? 'Saving...' : (completeApproverSlot?.approved ? 'Approve' : 'Reject')}
           </Button>
         </DialogActions>
       </Dialog>

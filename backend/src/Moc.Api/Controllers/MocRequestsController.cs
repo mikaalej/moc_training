@@ -287,7 +287,9 @@ public class MocRequestsController : ControllerBase
             await EnsureApproversForRequestAsync(request.Id);
         }
 
-        return CreatedAtAction(nameof(GetById), new { id = request.Id }, await GetById(request.Id));
+        // Return the created resource as the response body (DTO, not ActionResult) so the client receives id and can navigate
+        var detailResult = await GetById(request.Id);
+        return CreatedAtAction(nameof(GetById), new { id = request.Id }, detailResult.Value);
     }
 
     /// <summary>
@@ -397,7 +399,40 @@ public class MocRequestsController : ControllerBase
     }
 
     /// <summary>
+    /// Records an approver's decision (approve or reject) for their slot.
+    /// Only the approver slot for this request can be completed; once completed it cannot be changed.
+    /// Does not advance the stage; use advance-stage after required approvers have completed.
+    /// </summary>
+    [HttpPost("{id}/approvers/{approverId}/complete")]
+    public async Task<ActionResult<MocRequestDetailDto>> CompleteApprover(Guid id, Guid approverId, [FromBody] CompleteApproverDto dto)
+    {
+        var request = await _context.MocRequests.FindAsync(id);
+        if (request == null)
+            return NotFound();
+
+        var approver = await _context.MocApprovers
+            .FirstOrDefaultAsync(a => a.Id == approverId && a.MocRequestId == id);
+        if (approver == null)
+            return NotFound();
+
+        if (approver.IsCompleted)
+            return BadRequest(new { message = "This approver slot has already been completed." });
+
+        approver.IsCompleted = true;
+        approver.IsApproved = dto.Approved;
+        approver.Remarks = dto.Remarks;
+        approver.CompletedAtUtc = DateTime.UtcNow;
+        approver.CompletedBy = dto.CompletedBy ?? "system";
+        approver.ModifiedAtUtc = DateTime.UtcNow;
+        approver.ModifiedBy = dto.CompletedBy ?? "system";
+
+        await _context.SaveChangesAsync();
+        return await GetById(id);
+    }
+
+    /// <summary>
     /// Advances the request to the next workflow stage.
+    /// For Validation and FinalApproval stages, all required approvers for that stage must have completed and approved before advancing.
     /// </summary>
     [HttpPost("{id}/advance-stage")]
     public async Task<ActionResult<MocRequestDetailDto>> AdvanceStage(Guid id, [FromBody] AdvanceStageDto dto)
@@ -414,6 +449,28 @@ public class MocRequestsController : ControllerBase
         if (nextStage == null)
         {
             return BadRequest(new { message = "Request is already at the final stage." });
+        }
+
+        // Gate: require all approvers for the current stage (per Standard EMOC process) to have approved before advancing
+        var requiredRoles = GetRequiredApproverRolesForStage(request.CurrentStage);
+        if (requiredRoles.Count > 0)
+        {
+            var approvers = await _context.MocApprovers
+                .Where(a => a.MocRequestId == id && requiredRoles.Contains(a.RoleKey))
+                .ToListAsync();
+            if (approvers.Count > 0)
+            {
+                var notCompleted = approvers.Where(a => !a.IsCompleted || a.IsApproved != true).ToList();
+                if (notCompleted.Count > 0)
+                {
+                    var rolesMissing = notCompleted.Select(a => a.RoleKey).Distinct().ToList();
+                    return BadRequest(new
+                    {
+                        message = "Cannot advance: the following approver(s) must approve before advancing: " + string.Join(", ", rolesMissing) + ".",
+                        requiredRoles = rolesMissing
+                    });
+                }
+            }
         }
 
         request.CurrentStage = nextStage.Value;
@@ -721,6 +778,21 @@ public class MocRequestsController : ControllerBase
         };
     }
 
+    /// <summary>
+    /// Returns role keys that must have completed and approved before leaving this stage (Standard EMOC process).
+    /// Validation: CO Dept Manager (DepartmentManager). FinalApproval: CO Div Manager (DivisionManager).
+    /// Other stages have no approval gate so advancement is allowed when user triggers advance.
+    /// </summary>
+    private static IReadOnlyList<string> GetRequiredApproverRolesForStage(MocStage stage)
+    {
+        return stage switch
+        {
+            MocStage.Validation => new[] { "DepartmentManager" },
+            MocStage.FinalApproval => new[] { "DivisionManager" },
+            _ => Array.Empty<string>()
+        };
+    }
+
     #endregion
 }
 
@@ -895,6 +967,16 @@ public record UpdateMocRequestDto
 public record AdvanceStageDto
 {
     public string? Remarks { get; init; }
+}
+
+/// <summary>
+/// DTO for completing an approver slot (approve or reject).
+/// </summary>
+public record CompleteApproverDto
+{
+    public bool Approved { get; init; }
+    public string? Remarks { get; init; }
+    public string? CompletedBy { get; init; }
 }
 
 /// <summary>

@@ -250,7 +250,11 @@ export const mocApi = {
   
   advanceStage: (id: string, remarks?: string) => 
     axiosClient.post<MocRequestDetail>(`/mocrequests/${id}/advance-stage`, { remarks }),
-  
+
+  /** Records an approver's decision (approve or reject) for their slot. Required before advancing from Validation or FinalApproval. */
+  completeApprover: (mocId: string, approverId: string, body: { approved: boolean; remarks?: string; completedBy?: string }) =>
+    axiosClient.post<MocRequestDetail>(`/mocrequests/${mocId}/approvers/${approverId}/complete`, body),
+
   markInactive: (id: string) => 
     axiosClient.post<MocRequestDetail>(`/mocrequests/${id}/mark-inactive`),
   
