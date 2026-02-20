@@ -1,8 +1,10 @@
+import { useMemo } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import CssBaseline from '@mui/material/CssBaseline';
 
+import { ThemeModeProvider, useThemeMode } from './contexts/ThemeModeContext';
 import AppLayout from './components/layout/AppLayout';
 import Dashboard from './pages/Dashboard';
 import MyTasks from './pages/MyTasks';
@@ -30,77 +32,146 @@ const queryClient = new QueryClient({
   },
 });
 
-// Create MUI theme with enterprise-friendly styling
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#dc004e',
-    },
-    background: {
-      default: '#f5f5f5',
-    },
-  },
-  typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-    h4: {
-      fontWeight: 600,
-    },
-    h6: {
-      fontWeight: 600,
-    },
-  },
-  components: {
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          textTransform: 'none',
+/**
+ * Builds MUI theme for the given palette mode (light/dark).
+ * Dark mode uses explicit high-contrast text and background so labels and icons stay visible.
+ */
+function buildTheme(mode: 'light' | 'dark') {
+  const isDark = mode === 'dark';
+  return createTheme({
+    palette: {
+      mode,
+      primary: {
+        main: '#1976d2',
+      },
+      secondary: {
+        main: '#dc004e',
+      },
+      ...(isDark && {
+        background: {
+          default: '#121212',
+          paper: '#1e1e1e',
         },
+        text: {
+          primary: '#ffffff',
+          secondary: 'rgba(255, 255, 255, 0.85)',
+          disabled: 'rgba(255, 255, 255, 0.5)',
+        },
+        divider: 'rgba(255, 255, 255, 0.12)',
+        action: {
+          active: 'rgba(255, 255, 255, 0.9)',
+          hover: 'rgba(255, 255, 255, 0.08)',
+          selected: 'rgba(255, 255, 255, 0.16)',
+          disabled: 'rgba(255, 255, 255, 0.3)',
+        },
+      }),
+      ...(!isDark && {
+        background: {
+          default: '#f5f5f5',
+        },
+      }),
+    },
+    typography: {
+      fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+      h4: {
+        fontWeight: 600,
+      },
+      h6: {
+        fontWeight: 600,
       },
     },
-    MuiPaper: {
-      styleOverrides: {
-        root: {
-          borderRadius: 8,
+    components: {
+      MuiButton: {
+        styleOverrides: {
+          root: {
+            textTransform: 'none',
+          },
         },
       },
+      MuiPaper: {
+        styleOverrides: {
+          root: {
+            borderRadius: 8,
+          },
+        },
+      },
+      ...(isDark && {
+        MuiAppBar: {
+          styleOverrides: {
+            root: {
+              backgroundColor: '#1e1e1e',
+              color: '#ffffff',
+            },
+          },
+        },
+        MuiDrawer: {
+          styleOverrides: {
+            paper: {
+              backgroundColor: '#1e1e1e',
+              borderRight: '1px solid rgba(255, 255, 255, 0.12)',
+            },
+          },
+        },
+        MuiChip: {
+          styleOverrides: {
+            root: {
+              '&.MuiChip-outlined': {
+                borderColor: 'rgba(255, 255, 255, 0.3)',
+                color: '#ffffff',
+              },
+            },
+          },
+        },
+      }),
     },
-  },
-});
+  });
+}
+
+/**
+ * Inner app that has access to theme mode context and applies the theme.
+ */
+function AppWithTheme() {
+  const { mode } = useThemeMode();
+  const theme = useMemo(() => buildTheme(mode), [mode]);
+
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<AppLayout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="tasks" element={<MyTasks />} />
+            <Route path="create" element={<CreateRequest />} />
+            <Route path="mocs" element={<MocList />} />
+            <Route path="mocs/:id" element={<MocDetail />} />
+            <Route path="dmoc" element={<DmocList />} />
+            <Route path="dmoc/create" element={<DmocDraftPage />} />
+            <Route path="dmoc/:id" element={<DmocDetail />} />
+            <Route path="dmoc/:id/edit" element={<DmocDraftPage />} />
+            <Route path="manuals" element={<Manuals />} />
+            <Route path="reports" element={<Reports />} />
+            <Route path="feedback" element={<Feedback />} />
+            <Route path="help" element={<Help />} />
+            <Route path="admin" element={<Admin />} />
+            <Route path="notifications" element={<Notifications />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </ThemeProvider>
+  );
+}
 
 /**
  * Main App component with routing and providers.
- * Sets up React Router, MUI Theme, and React Query.
+ * Sets up React Router, MUI Theme (light/dark), and React Query.
  */
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<AppLayout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="tasks" element={<MyTasks />} />
-              <Route path="create" element={<CreateRequest />} />
-              <Route path="mocs" element={<MocList />} />
-              <Route path="mocs/:id" element={<MocDetail />} />
-              <Route path="dmoc" element={<DmocList />} />
-              <Route path="dmoc/create" element={<DmocDraftPage />} />
-              <Route path="dmoc/:id" element={<DmocDetail />} />
-              <Route path="dmoc/:id/edit" element={<DmocDraftPage />} />
-              <Route path="manuals" element={<Manuals />} />
-              <Route path="reports" element={<Reports />} />
-              <Route path="feedback" element={<Feedback />} />
-              <Route path="help" element={<Help />} />
-              <Route path="admin" element={<Admin />} />
-              <Route path="notifications" element={<Notifications />} />
-            </Route>
-          </Routes>
-        </BrowserRouter>
-      </ThemeProvider>
+      <ThemeModeProvider>
+        <AppWithTheme />
+      </ThemeModeProvider>
     </QueryClientProvider>
   );
 }

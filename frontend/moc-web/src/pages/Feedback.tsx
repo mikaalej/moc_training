@@ -134,7 +134,7 @@ export default function Feedback() {
           </Alert>
         )}
         <Grid container spacing={2}>
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} sm={6}>
             <TextField
               label="Related MOC ID (optional)"
               fullWidth
@@ -144,7 +144,7 @@ export default function Feedback() {
               helperText="Paste the MOC request GUID if applicable."
             />
           </Grid>
-          <Grid item xs={12} md={8}>
+          <Grid item xs={12} sm={6}>
             <TextField
               label="Title"
               fullWidth
@@ -152,38 +152,45 @@ export default function Feedback() {
               value={form.title}
               onChange={(e) => handleFormChange('title', e.target.value)}
               required
+              placeholder="Short summary"
             />
           </Grid>
           <Grid item xs={12}>
             <TextField
               label="Message"
               fullWidth
+              size="small"
               multiline
               minRows={3}
+              maxRows={6}
               value={form.message}
               onChange={(e) => handleFormChange('message', e.target.value)}
               required
+              placeholder="Describe the feedback or lesson learned."
             />
           </Grid>
-          <Grid item xs={12} md={6}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={form.isLessonLearned}
-                  onChange={(e) => handleFormChange('isLessonLearned', e.target.checked)}
-                />
-              }
-              label="This is a lesson learned"
-            />
-          </Grid>
-          <Grid item xs={12} md={6} sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
-            <Button
-              variant="contained"
-              onClick={handleSubmit}
-              disabled={saving}
-            >
-              {saving ? 'Submitting…' : 'Submit feedback'}
-            </Button>
+          <Grid item xs={12}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={form.isLessonLearned}
+                    onChange={(e) => handleFormChange('isLessonLearned', e.target.checked)}
+                  />
+                }
+                label="This is a lesson learned"
+              />
+              <Button
+                variant="contained"
+                size="small"
+                onClick={handleSubmit}
+                disabled={saving}
+                sx={{ minWidth: 120 }}
+              >
+                {saving ? 'Submitting…' : 'Submit feedback'}
+              </Button>
+            </Box>
           </Grid>
         </Grid>
       </Paper>

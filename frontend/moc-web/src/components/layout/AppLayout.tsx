@@ -18,6 +18,7 @@ import {
   Menu,
   MenuItem,
   Avatar,
+  Tooltip,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -34,8 +35,11 @@ import {
   Notifications as NotificationsIcon,
   AccountCircle as AccountIcon,
   BusinessCenter as DmocIcon,
+  DarkMode as DarkModeIcon,
+  LightMode as LightModeIcon,
 } from '@mui/icons-material';
 import { useDmocFeatures } from '../../hooks/useDmocFeatures';
+import { useThemeMode } from '../../contexts/ThemeModeContext';
 
 const drawerWidth = 260;
 
@@ -68,6 +72,7 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { enableDmoc } = useDmocFeatures();
+  const { mode, toggleMode } = useThemeMode();
 
   const navItems = enableDmoc
     ? [...baseNavItems, { text: 'DMOC', icon: <DmocIcon />, path: '/dmoc' }]
@@ -158,7 +163,14 @@ export default function AppLayout() {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Management of Change
           </Typography>
-          
+
+          {/* Dark / Light mode toggle */}
+          <Tooltip title={mode === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}>
+            <IconButton color="inherit" onClick={toggleMode} aria-label="Toggle dark mode">
+              {mode === 'light' ? <DarkModeIcon /> : <LightModeIcon />}
+            </IconButton>
+          </Tooltip>
+
           {/* Notifications Bell */}
           <IconButton color="inherit" onClick={() => navigate('/notifications')}>
             <Badge badgeContent={3} color="error">
@@ -231,7 +243,7 @@ export default function AppLayout() {
           width: { sm: `calc(100% - ${drawerWidth}px)` },
           mt: '64px', // AppBar height
           minHeight: 'calc(100vh - 64px)',
-          backgroundColor: '#f5f5f5',
+          backgroundColor: 'background.default',
         }}
       >
         <Outlet />
