@@ -435,17 +435,29 @@ export default function CreateRequest() {
       setSubmitLoading(true);
       setSubmitError(null);
       if (draftId) {
-        await mocApi.submit(draftId);
-        const res = await mocApi.getById(draftId);
+        const submitRes = await mocApi.submit(draftId);
         setSubmitLoading(false);
-        setSuccessSnackbar(`Request submitted. Control number: ${res.data.controlNumber}`);
-        navigate(`/mocs/${draftId}`, { replace: true });
+        const mocId = submitRes.data?.id || draftId;
+        setSuccessSnackbar(`Request submitted. Control number: ${submitRes.data.controlNumber}`);
+        navigate(`/mocs/${mocId}`, { replace: true });
       } else {
         const dto = selectedType === 'BypassEmoc' ? buildBypassDto(false) : buildCreateDto(false);
         const res = await mocApi.create(dto);
         setSubmitLoading(false);
-        setSuccessSnackbar(`Request submitted. Control number: ${res.data.controlNumber}`);
-        navigate(`/mocs/${res.data.id}`, { replace: true });
+        // Extract ID from response body or Location header
+        let mocId = res.data?.id;
+        if (!mocId && res.headers?.location) {
+          // Fallback: extract ID from Location header (e.g., "/api/mocrequests/{id}")
+          const match = res.headers.location.match(/\/mocrequests\/([^\/\?]+)/i);
+          if (match) mocId = match[1];
+        }
+        if (!mocId) {
+          console.error('Create response missing id. Response:', res);
+          setSubmitError('MOC was created successfully, but could not navigate to detail page. Please find it in the MOC list.');
+          return;
+        }
+        setSuccessSnackbar(`Request submitted. Control number: ${res.data?.controlNumber || 'N/A'}`);
+        navigate(`/mocs/${mocId}`, { replace: true });
       }
     } catch (err: unknown) {
       setSubmitLoading(false);

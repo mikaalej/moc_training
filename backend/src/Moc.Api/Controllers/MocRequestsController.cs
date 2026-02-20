@@ -303,9 +303,96 @@ public class MocRequestsController : ControllerBase
             await EnsureApproversForRequestAsync(request.Id);
         }
 
-        // Return the created resource as the response body (DTO, not ActionResult) so the client receives id and can navigate
-        var detailResult = await GetById(request.Id);
-        return CreatedAtAction(nameof(GetById), new { id = request.Id }, detailResult.Value);
+        // Get lookup names for the response DTO
+        var division = await _context.Divisions.FindAsync(request.DivisionId);
+        var department = await _context.Departments.FindAsync(request.DepartmentId);
+        var section = await _context.Sections.FindAsync(request.SectionId);
+        var category = await _context.Categories.FindAsync(request.CategoryId);
+        var subcategory = await _context.Subcategories.FindAsync(request.SubcategoryId);
+
+        // Resolve approval level order for approvers
+        var levels = await _context.ApprovalLevels
+            .Where(x => x.IsActive)
+            .OrderBy(x => x.Order)
+            .ToListAsync();
+        var roleToLevelOrder = levels.ToDictionary(x => x.RoleKey, x => x.Order);
+
+        var approversList = request.Approvers
+            .Select(ap => new MocApproverDto
+            {
+                Id = ap.Id,
+                RoleKey = ap.RoleKey,
+                LevelOrder = roleToLevelOrder.GetValueOrDefault(ap.RoleKey, 999),
+                IsCompleted = ap.IsCompleted,
+                IsApproved = ap.IsApproved,
+                Remarks = ap.Remarks,
+                CompletedAtUtc = ap.CompletedAtUtc,
+                CompletedBy = ap.CompletedBy
+            })
+            .OrderBy(a => a.LevelOrder)
+            .ToList();
+
+        var detailDto = new MocRequestDetailDto
+        {
+            Id = request.Id,
+            ControlNumber = request.ControlNumber,
+            RequestType = request.RequestType,
+            RequestTypeName = request.RequestType.ToString(),
+            Title = request.Title,
+            Originator = request.Originator,
+            DivisionId = request.DivisionId,
+            DivisionName = division?.Name ?? "",
+            DepartmentId = request.DepartmentId,
+            DepartmentName = department?.Name ?? "",
+            SectionId = request.SectionId,
+            SectionName = section?.Name ?? "",
+            CategoryId = request.CategoryId,
+            CategoryName = category?.Name ?? "",
+            SubcategoryId = request.SubcategoryId,
+            SubcategoryName = subcategory?.Name ?? "",
+            UnitsAffected = request.UnitsAffected,
+            EquipmentTag = request.EquipmentTag,
+            IsTemporary = request.IsTemporary,
+            TargetImplementationDate = request.TargetImplementationDate,
+            PlannedRestorationDate = request.PlannedRestorationDate,
+            ScopeDescription = request.ScopeDescription,
+            RiskToolUsed = request.RiskToolUsed,
+            RiskLevel = request.RiskLevel,
+            RiskLevelName = request.RiskLevel?.ToString(),
+            CurrentStage = request.CurrentStage,
+            CurrentStageName = request.CurrentStage.ToString(),
+            Status = request.Status,
+            StatusName = request.Status.ToString(),
+            BypassDurationDays = request.BypassDurationDays,
+            IsBypassEmergency = request.IsBypassEmergency,
+            BypassType = request.BypassType,
+            MarkedInactiveAtUtc = request.MarkedInactiveAtUtc,
+            CreatedAtUtc = request.CreatedAtUtc,
+            CreatedBy = request.CreatedBy,
+            ModifiedAtUtc = request.ModifiedAtUtc,
+            ModifiedBy = request.ModifiedBy,
+            ActionItems = request.ActionItems.Select(a => new MocActionItemDto
+            {
+                Id = a.Id,
+                Description = a.Description,
+                DueDate = a.DueDate,
+                IsCompleted = a.IsCompleted,
+                CompletedAtUtc = a.CompletedAtUtc
+            }).ToList(),
+            Documents = request.Documents.Select(d => new MocDocumentDto
+            {
+                Id = d.Id,
+                DocumentGroup = d.DocumentGroup,
+                DocumentType = d.DocumentType,
+                Name = d.Name,
+                IsLink = d.IsLink,
+                Url = d.Url
+            }).ToList(),
+            Approvers = approversList
+        };
+
+        // Return the created resource with Location header pointing to GetById endpoint
+        return CreatedAtAction(nameof(GetById), new { id = request.Id }, detailDto);
     }
 
     /// <summary>
