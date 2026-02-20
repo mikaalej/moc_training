@@ -74,6 +74,11 @@ public class MocDbContext : DbContext
     /// </summary>
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
 
+    /// <summary>
+    /// DbSet for DMOC (Departmental Management of Change) requests. Isolated from MocRequests.
+    /// </summary>
+    public DbSet<DmocRequest> DmocRequests => Set<DmocRequest>();
+
     // Workflow and task management
     /// <summary>
     /// DbSet for workflow tasks that appear in "My Tasks" screens.

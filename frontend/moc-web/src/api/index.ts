@@ -13,4 +13,5 @@ export * from './feedbackApi';
 export * from './rolesApi';
 export * from './approvalLevelsApi';
 export * from './usersApi';
+export * from './dmocApi';
 export { default as axiosClient } from './axiosClient';

@@ -33,15 +33,17 @@ import {
   Logout as LogoutIcon,
   Notifications as NotificationsIcon,
   AccountCircle as AccountIcon,
+  BusinessCenter as DmocIcon,
 } from '@mui/icons-material';
+import { useDmocFeatures } from '../../hooks/useDmocFeatures';
 
 const drawerWidth = 260;
 
 /**
- * Navigation items for the sidebar.
- * Matches the high-level navigation from the requirements.
+ * Base navigation items for the sidebar.
+ * DMOC item is appended when EnableDmoc is true (see AppLayout).
  */
-const navItems = [
+const baseNavItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
   { text: 'My Tasks', icon: <TaskIcon />, path: '/tasks' },
   { text: 'Create Request', icon: <AddIcon />, path: '/create' },
@@ -65,6 +67,11 @@ export default function AppLayout() {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const { enableDmoc } = useDmocFeatures();
+
+  const navItems = enableDmoc
+    ? [...baseNavItems, { text: 'DMOC', icon: <DmocIcon />, path: '/dmoc' }]
+    : baseNavItems;
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);

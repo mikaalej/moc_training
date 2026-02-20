@@ -9,6 +9,9 @@ import MyTasks from './pages/MyTasks';
 import CreateRequest from './pages/CreateRequest';
 import MocList from './pages/MocList';
 import MocDetail from './pages/MocDetail';
+import DmocList from './pages/DmocList';
+import DmocDetail from './pages/DmocDetail';
+import DmocDraftPage from './pages/DmocDraftPage';
 import Manuals from './pages/Manuals';
 import Reports from './pages/Reports';
 import Feedback from './pages/Feedback';
@@ -84,6 +87,10 @@ function App() {
               <Route path="create" element={<CreateRequest />} />
               <Route path="mocs" element={<MocList />} />
               <Route path="mocs/:id" element={<MocDetail />} />
+              <Route path="dmoc" element={<DmocList />} />
+              <Route path="dmoc/create" element={<DmocDraftPage />} />
+              <Route path="dmoc/:id" element={<DmocDetail />} />
+              <Route path="dmoc/:id/edit" element={<DmocDraftPage />} />
               <Route path="manuals" element={<Manuals />} />
               <Route path="reports" element={<Reports />} />
               <Route path="feedback" element={<Feedback />} />

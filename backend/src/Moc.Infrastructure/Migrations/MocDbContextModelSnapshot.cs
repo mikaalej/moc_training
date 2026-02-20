@@ -330,6 +330,101 @@ namespace Moc.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Moc.Domain.Entities.DmocRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AdditionalRemarks")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("AffectedEquipment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid?>("AreaOrDepartmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AreaOrDepartmentName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("AttachmentsOrReferenceLinks")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("ChangeOriginatorName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("ChangeOriginatorUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DescriptionOfChange")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DmocNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("ModifiedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("NatureOfChange")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("PlannedEndDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ReasonForChange")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("TargetImplementationDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("OriginatorPosition")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AreaOrDepartmentId");
+
+                    b.HasIndex("ChangeOriginatorUserId");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("DmocNumber")
+                        .IsUnique()
+                        .HasFilter("[DmocNumber] IS NOT NULL");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("DmocRequests", (string)null);
+                });
+
             modelBuilder.Entity("Moc.Domain.Entities.Division", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1243,6 +1338,14 @@ namespace Moc.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Division");
+                });
+
+            modelBuilder.Entity("Moc.Domain.Entities.DmocRequest", b =>
+                {
+                    b.HasOne("Moc.Domain.Entities.Department", null)
+                        .WithMany()
+                        .HasForeignKey("AreaOrDepartmentId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("Moc.Domain.Entities.FeedbackEntry", b =>

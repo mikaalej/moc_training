@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Moc.Api.Middleware;
+using Moc.Application.Dmoc;
+using Moc.Infrastructure.Dmoc;
 using Moc.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -34,6 +36,9 @@ builder.Services.AddDbContext<MocDbContext>(options =>
 
 // Register the database initializer as a scoped service
 builder.Services.AddScoped<MocDbInitializer>();
+
+// DMOC (Departmental Management of Change) service; feature enabled via EnableDmoc config
+builder.Services.AddScoped<IDmocService, DmocService>();
 
 var app = builder.Build();
 
