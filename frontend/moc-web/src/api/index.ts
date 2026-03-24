@@ -15,4 +15,5 @@ export * from './approvalLevelsApi';
 export * from './usersApi';
 export * from './authApi';
 export * from './dmocApi';
+export { API_BASE_URL, API_REST_BASE_URL, api } from './client';
 export { default as axiosClient } from './axiosClient';

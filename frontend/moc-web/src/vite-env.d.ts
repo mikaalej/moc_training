@@ -2,7 +2,7 @@
 
 /**
  * Vite client env typing for MOC web.
- * VITE_API_BASE_URL is the backend origin only (no path); /api is appended in axiosClient.
+ * VITE_API_BASE_URL is the backend origin only (no path); /api is appended in client.ts.
  */
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string;
